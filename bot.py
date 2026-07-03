@@ -1,7 +1,9 @@
 import os
 import logging
 import sqlite3
+import threading
 import uuid
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from telegram import Update
 from telegram.ext import (
@@ -102,7 +104,26 @@ async def handle_upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await message.reply_text(f"File saved! Share this link:\n{link}")
 
 
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"Bot is running.")
+
+    def log_message(self, format, *args):
+        pass
+
+
+def run_health_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), _HealthHandler)
+    server.serve_forever()
+
+
 def main():
+    threading.Thread(target=run_health_server, daemon=True).start()
+
     init_db()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
